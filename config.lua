@@ -42,6 +42,7 @@ if Config.isRDR then
 	Config.LookLrControl          = `INPUT_LOOK_LR`
 	Config.LookUdControl          = `INPUT_LOOK_UD`
 	Config.EntityHandlesControl   = `INPUT_MAP` -- M
+	Config.ToggleHudControl       = `INPUT_FRONTEND_CANCEL` -- BACKSPACE
 else
 	Config.IncreaseSpeedControl   = 15 -- Page Up, Mouse Wheel Up
 	Config.DecreaseSpeedControl   = 14 -- Page Down, Mouse Wheel Down

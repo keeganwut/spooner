@@ -1,6 +1,7 @@
 var peds = [];
 var vehicles = [];
 var objects = [];
+var databaseObjects = [];
 var scenarios = [];
 var weapons = [];
 var animations = {};
@@ -309,6 +310,32 @@ function closeVehicleMenu(selected) {
 	}
 }
 
+function createTempobj(selected) {
+	if (selected) {
+		var name = selected.getAttribute('data-model');
+
+		sendMessage('createTempobj', {
+			modelName: name
+		});
+
+		document.querySelectorAll('#object-list .object').forEach(e => {
+			if (favourites.objects[e.getAttribute('data-model')]) {
+				e.className = 'object favourite';
+			} else {
+				e.className = 'object';
+			}
+		});
+		selected.className = 'object selected';
+	} else {
+		document.querySelector('#spawn-menu').style.display = 'flex';
+		lastSpawnMenu = -1;
+	}
+}
+
+function clearTempobj(name) {
+	sendMessage('clearTempobj');
+}
+
 function closeObjectMenu(selected) {
 	document.querySelector('#object-menu').style.display = 'none';
 
@@ -328,6 +355,8 @@ function closeObjectMenu(selected) {
 		});
 		selected.className = 'object selected';
 	} else {
+		clearTempobj();
+
 		document.querySelector('#spawn-menu').style.display = 'flex';
 		lastSpawnMenu = -1;
 	}
@@ -659,7 +688,7 @@ function populateObjectList(filter) {
 			div.innerHTML = name;
 
 			div.addEventListener('click', function(event) {
-				closeObjectMenu(this);
+				createTempobj(this);
 			});
 
 			if (isFav) {
@@ -1002,11 +1031,80 @@ function entityDisplayName(entity, props) {
 	}
 }
 
+function populateDatabaseList(filter) {
+	var databaseList = document.getElementById('object-database-list');
+
+	databaseList.innerHTML = '';
+
+	var keys = Object.keys(databaseObjects);
+
+	var totalEntities = keys.length;
+	var totalPeds = 0;
+	var totalVehicles = 0;
+	var totalObjects = 0;
+	var totalNetworked = 0;
+
+	keys.forEach(function(handle) {
+		var entityId = parseInt(handle);
+
+		switch (databaseObjects[handle].type) {
+			case 1:
+				++totalPeds;
+				break;
+			case 2:
+				++totalVehicles;
+				break;
+			case 3:
+				++totalObjects;
+				break;
+		}
+
+		if (databaseObjects[handle].netId) {
+			++totalNetworked;
+		}
+
+		if (!filter || filter == '' || databaseObjects[handle].name.toLowerCase().includes(filter.toLowerCase())) {
+
+			var div = document.createElement('div');
+
+			if (databaseObjects[handle].isSelf) {
+				div.className = 'object self';
+			} else if (!databaseObjects[handle].exists) {
+				div.className = 'object invalid';
+			} else {
+				div.className = 'object'
+			}
+
+			div.innerHTML = entityDisplayName(entityId, databaseObjects[handle]);
+
+			div.setAttribute('data-handle', handle);
+			div.addEventListener('click', function(event) {
+				document.querySelector('#object-database').style.display = 'none';
+				sendMessage('openPropertiesMenuForEntity', {
+					entity: entityId
+				});
+			});
+			div.addEventListener('contextmenu', function(event) {
+				deleteEntity(this);
+			});
+			databaseList.appendChild(div);
+		}
+	});
+
+	document.getElementById('object-database-total-entities').innerHTML = keys.length;
+	document.getElementById('object-database-total-peds').innerHTML = totalPeds;
+	document.getElementById('object-database-total-vehicles').innerHTML = totalVehicles;
+	document.getElementById('object-database-total-objects').innerHTML = totalObjects;
+	document.getElementById('object-database-total-networked').innerHTML = totalNetworked;
+
+	document.querySelector('#object-database').style.display = 'flex';
+}
+
 function openDatabase(data) {
 	var objectList = document.querySelector('#object-database-list');
-	var database = JSON.parse(data.database);
-
-	var keys = Object.keys(database);
+	databaseObjects = JSON.parse(data.database);
+	
+	var keys = Object.keys(databaseObjects);
 
 	var totalEntities = keys.length;
 	var totalPeds = 0;
@@ -1019,7 +1117,7 @@ function openDatabase(data) {
 	keys.forEach(function(handle) {
 		var entityId = parseInt(handle);
 
-		switch (database[handle].type) {
+		switch (databaseObjects[handle].type) {
 			case 1:
 				++totalPeds;
 				break;
@@ -1031,21 +1129,21 @@ function openDatabase(data) {
 				break;
 		}
 
-		if (database[handle].netId) {
+		if (databaseObjects[handle].netId) {
 			++totalNetworked;
 		}
 
 		var div = document.createElement('div');
 
-		if (database[handle].isSelf) {
+		if (databaseObjects[handle].isSelf) {
 			div.className = 'object self';
-		} else if (!database[handle].exists) {
+		} else if (!databaseObjects[handle].exists) {
 			div.className = 'object invalid';
 		} else {
 			div.className = 'object'
 		}
 
-		div.innerHTML = entityDisplayName(entityId, database[handle]);
+		div.innerHTML = entityDisplayName(entityId, databaseObjects[handle]);
 
 		div.setAttribute('data-handle', handle);
 		div.addEventListener('click', function(event) {
@@ -1552,6 +1650,14 @@ function hideControls() {
 	document.getElementById('controls').style.display = 'none';
 }
 
+function ShowHud() {
+	document.getElementById('hud').style.display = 'flex';
+}
+
+function HideHud() {
+	document.getElementById('hud').style.display = 'none';
+}
+
 function populatePedConfigFlagsList(flags) {
 	var configFlagsList = document.getElementById('config-flags-list');
 
@@ -1644,6 +1750,12 @@ window.addEventListener('message', function(event) {
 		case 'hideControls':
 			hideControls();
 			break;
+		case 'ShowHud':
+			ShowHud();
+			break;
+		case 'HideHud':
+			HideHud();
+			break;
 	}
 });
 
@@ -1712,6 +1824,10 @@ window.addEventListener('load', function() {
 
 	document.querySelector('#object-search-filter').addEventListener('input', function(event) {
 		populateObjectList(this.value);
+	});
+
+	document.querySelector('#database-search-filter').addEventListener('input', function(event) {
+		populateDatabaseList(this.value);
 	});
 
 	document.getElementById('propset-search-filter').addEventListener('input', function(event) {
@@ -2524,12 +2640,20 @@ window.addEventListener('load', function() {
 		copyToClipboard(x + ', ' + y + ', ' + z)
 	});
 
+	document.getElementById('paste-position').addEventListener('click', function(event) {
+		// Paste Position
+	});
+
 	document.getElementById('copy-rotation').addEventListener('click', function(event) {
 		var p = document.getElementById('properties-pitch').value;
 		var r = document.getElementById('properties-roll').value;
 		var y = document.getElementById('properties-yaw').value;
 
 		copyToClipboard(p + ', ' + r + ', ' + y);
+	});
+
+	document.getElementById('paste-rotation').addEventListener('click', function(event) {
+		// Paste Rotation
 	});
 
 	document.getElementById('copy-attachment-position').addEventListener('click', function(event) {
@@ -2543,7 +2667,7 @@ window.addEventListener('load', function() {
 	document.getElementById('copy-model-name').addEventListener('click', function(event) {
                var modelname = document.getElementById('properties-model').innerText;
                copyToClipboard(modelname)
-       });
+		});
 
 	document.getElementById('copy-attachment-rotation').addEventListener('click', function(event) {
 		var p = document.getElementById('attachment-pitch').value;

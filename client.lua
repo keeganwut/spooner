@@ -16,24 +16,23 @@ local FocusTarget
 local FocusTargetPos
 local FreeFocus = false
 local showEntityHandles = false
+local hud = false
 
 local SpoonerPrompts, ClearTasksPrompt, DetachPrompt
 
-if Config.isRDR then
-	SpoonerPrompts = UipromptGroup:new("Spooner", false)
+SpoonerPrompts = UipromptGroup:new("Spooner", false)
 
-	ClearTasksPrompt = Uiprompt:new(`INPUT_INTERACT_NEG`, "Clear Tasks", SpoonerPrompts)
-	ClearTasksPrompt:setHoldMode(true)
-	ClearTasksPrompt:setOnHoldModeJustCompleted(function()
-	       TryClearTasks(PlayerPedId())
-	end)
+ClearTasksPrompt = Uiprompt:new(`INPUT_INTERACT_NEG`, "Clear Tasks", SpoonerPrompts)
+ClearTasksPrompt:setHoldMode(true)
+ClearTasksPrompt:setOnHoldModeJustCompleted(function()
+	TryClearTasks(PlayerPedId())
+end)
 
-	DetachPrompt = Uiprompt:new(`INPUT_INTERACT_LEAD_ANIMAL`, "Detach", SpoonerPrompts)
-	DetachPrompt:setHoldMode(true)
-	DetachPrompt:setOnHoldModeJustCompleted(function()
-	       TryDetach(PlayerPedId())
-	end)
-end
+DetachPrompt = Uiprompt:new(`INPUT_INTERACT_LEAD_ANIMAL`, "Detach", SpoonerPrompts)
+DetachPrompt:setHoldMode(true)
+DetachPrompt:setOnHoldModeJustCompleted(function()
+	TryDetach(PlayerPedId())
+end)
 
 local StoreDeleted = false
 local DeletedEntities = {}
@@ -245,6 +244,7 @@ end
 
 function OpenDatabaseMenu()
 	UpdateDatabase()
+
 	SendNUIMessage({
 		type = 'openDatabase',
 		database = json.encode(Database)
@@ -365,32 +365,18 @@ function GetBoneIndex(entity, bone)
 	if type(bone) == 'number' then
 		return bone
 	else
-		if Config.isRDR then
-			return GetEntityBoneIndexByName(entity, bone)
-		else
-			return GetPedBoneIndex(entity, Bones[bone])
-		end
+		return GetEntityBoneIndexByName(entity, bone)
 	end
 end
 
 function FindBoneName(entity, boneIndex)
-	if Config.isRDR then
-		for _, boneName in ipairs(Bones) do
-			if GetEntityBoneIndexByName(entity, boneName) == boneIndex then
-				return boneName
-			end
+	for _, boneName in ipairs(Bones) do
+		if GetEntityBoneIndexByName(entity, boneName) == boneIndex then
+			return boneName
 		end
-
-		return boneIndex
-	else
-		for boneName, boneId in pairs(Bones) do
-			if GetPedBoneIndex(entity, boneId) == boneIndex then
-				return boneName
-			end
-		end
-
-		return boneIndex
 	end
+
+	return boneIndex
 end
 
 function GetPedConfigFlags(ped)
@@ -429,7 +415,7 @@ function GetLiveEntityProperties(entity)
 		isSelf = entity == PlayerPedId(),
 		playerName = player and GetPlayerName(player),
 		weapons = {},
-		isFrozen = Config.isRDR and IsEntityFrozen(entity) or false,
+		isFrozen = true and IsEntityFrozen(entity) or false,
 		isVisible = IsEntityVisible(entity),
 		pedConfigFlags = type == 1 and GetPedConfigFlags(entity) or nil,
 		attachment = {
@@ -548,10 +534,6 @@ function AddEntityToDatabase(entity, name, attachment)
 
 	Database[entity].scale = scale
 
-	if not Config.isRDR then
-		Database[entity].isFrozen = isFrozen
-	end
-
 	return Database[entity]
 end
 
@@ -615,6 +597,54 @@ function SetWalkStyle(ped, base, style)
 	end
 end
 
+function TempSpawnObject(name, model, x, y, z, pitch, roll, yaw, collisionDisabled, isVisible, lightsIntensity, lightsColour, lightsType)
+	if not Permissions.spawn.object then
+		return nil
+	end
+
+	if IsDatabaseFull() then
+		return nil
+	end
+
+	if not LoadModel(model) then
+		return nil
+	end
+
+	local object = CreateObjectNoOffset(model, x, y, z, true, false, true)
+
+	SetModelAsNoLongerNeeded(model)
+
+	if not object or object < 1 then
+		return nil
+	end
+
+	SetEntityRotation(object, pitch, roll, yaw, 2)
+
+	FreezeEntityPosition(object, true)
+
+	if collisionDisabled then
+		SetEntityCollision(object, false, false)
+	end
+
+	if isVisible == false then
+		SetEntityVisible(object, false)
+	end
+
+	if lightsIntensity then
+		SetLightsIntensityForEntity(object, lightsIntensity)
+	end
+
+	if lightsColour then
+		SetLightsColorForEntity(object, lightsColour.red, lightsColour.green, lightsColour.blue)
+	end
+
+	if lightsType then
+		SetLightsTypeForEntity(object, lightsType)
+	end
+
+	return object
+end
+
 function SpawnObject(name, model, x, y, z, pitch, roll, yaw, collisionDisabled, isVisible, lightsIntensity, lightsColour, lightsType)
 	if not Permissions.spawn.object then
 		return nil
@@ -662,10 +692,6 @@ function SpawnObject(name, model, x, y, z, pitch, roll, yaw, collisionDisabled, 
 
 	AddEntityToDatabase(object, name)
 
-	if not Config.isRDR and Database[object] then
-		Database[object].isFrozen = true
-	end
-
 	return object
 end
 
@@ -708,10 +734,6 @@ function SpawnVehicle(name, model, x, y, z, pitch, roll, yaw, collisionDisabled,
 
 	AddEntityToDatabase(veh, name)
 
-	if not Config.isRDR and Database[veh] then
-		Database[veh].isFrozen = collisionDisabled
-	end
-
 	return veh
 end
 
@@ -734,11 +756,7 @@ function PlayAnimation(ped, anim)
 end
 
 local function startScenario(ped, scenario)
-	if Config.isRDR then
-		TaskStartScenarioInPlace(ped, GetHashKey(scenario), -1)
-	else
-		TaskStartScenarioInPlace(ped, scenario, -1)
-	end
+	TaskStartScenarioInPlace(ped, GetHashKey(scenario), -1)
 end
 
 function SpawnPed(props)
@@ -755,11 +773,7 @@ function SpawnPed(props)
 	end
 
 	local ped
-	if Config.isRDR then
-		ped = CreatePed_2(props.model, props.x, props.y, props.z, 0.0, true, false)
-	else
-		ped = CreatePed(0, props.model, props.x, props.y, props.z, 0.0, true, false)
-	end
+	ped = CreatePed_2(props.model, props.x, props.y, props.z, 0.0, true, false)
 
 	SetModelAsNoLongerNeeded(props.model)
 
@@ -803,11 +817,7 @@ function SpawnPed(props)
 
 	if props.weapons then
 		for _, weapon in ipairs(props.weapons) do
-			if Config.isRDR then
-				GiveWeaponToPed_2(ped, GetHashKey(weapon), 500, true, false, 0, false, 0.5, 1.0, 0, false, 0.0, false)
-			else
-				GiveWeaponToPed(ped, GetHashKey(weapon), 500, false, true)
-			end
+			GiveWeaponToPed_2(ped, GetHashKey(weapon), 500, true, false, 0, false, 0.5, 1.0, 0, false, 0.0, false)
 		end
 	end
 
@@ -833,10 +843,6 @@ function SpawnPed(props)
 	Database[ped].weapons = props.weapons
 	Database[ped].walkStyle = props.walkStyle
 	Database[ped].scale = props.scale
-
-	if not Config.isRDR and Database[ped] then
-		Database[ped].isFrozen = props.collisionDisabled
-	end
 
 	return ped
 end
@@ -1055,6 +1061,52 @@ RegisterNUICallback('closeVehicleMenu', function(data, cb)
 	cb({})
 end)
 
+local tempobjec = nil
+
+function getCamCoords()
+	local x1, y1, z1 = table.unpack(GetCamCoord(Cam))
+	local pitch1, roll1, yaw1 = table.unpack(GetCamRot(Cam, 2))
+
+	local x2 = x1
+	local y2 = y1
+	local z2 = z1
+	local pitch2 = pitch1
+	local roll2 = roll1
+	local yaw2 = yaw1
+
+	local spawnPos, entity, distance = GetInView(x2, y2, z2, pitch2, roll2, yaw2)
+	return spawnPos, entity, distance
+end
+
+RegisterNUICallback('createTempobj', function(data, cb)
+	CurrentSpawn = {
+		modelName = data.modelName,
+		type = 3
+	}
+
+	if tempobjec then
+		DeleteEntity(tempobjec)
+		tempobjec = nil
+	end
+
+	local spawnPos, entity, distance = getCamCoords()
+
+	entity = TempSpawnObject(CurrentSpawn.modelName, GetHashKey(CurrentSpawn.modelName), spawnPos.x, spawnPos.y, spawnPos.z, 0.0, 0.0, yaw2, false, true, nil, nil, nil)
+	tempobjec = entity
+	PlaceOnGroundProperly(tempobjec)
+	cb({})
+end)
+
+RegisterNUICallback('clearTempobj', function(data, cb)
+	if tempobjec then
+		DeleteEntity(tempobjec)
+
+		tempobjec = nil
+	end
+
+	cb({})
+end)
+
 RegisterNUICallback('closeObjectMenu', function(data, cb)
 	if data.modelName and (Permissions.spawn.byName or Contains(Objects, data.modelName)) then
 		CurrentSpawn = {
@@ -1152,10 +1204,6 @@ RegisterNUICallback('freezeEntity', function(data, cb)
 	if Permissions.properties.freeze and CanModifyEntity(data.handle) then
 		RequestControl(data.handle)
 		FreezeEntityPosition(data.handle, true)
-
-		if not Config.isRDR and Database[data.handle] then
-			Database[data.handle].isFrozen = true
-		end
 	end
 	cb({})
 end)
@@ -1164,10 +1212,6 @@ RegisterNUICallback('unfreezeEntity', function(data, cb)
 	if Permissions.properties.freeze and CanModifyEntity(data.handle) then
 		RequestControl(data.handle)
 		FreezeEntityPosition(data.handle, false)
-
-		if not Config.isRDR and Database[data.handle] then
-			Database[data.handle].isFrozen = false
-		end
 	end
 	cb({})
 end)
@@ -1318,17 +1362,7 @@ end
 function PlaceOnGroundProperly(entity)
 	local r1 = GetEntityRotation(entity, 2)
 
-	if Config.isRDR then
-		PlaceEntityOnGroundProperly(entity, false)
-	else
-		local type = GetEntityType(entity)
-
-		if type == 2 then
-			SetVehicleOnGroundProperly(entity)
-		elseif type == 3 then
-			PlaceObjectOnGroundProperly(entity, false)
-		end
-	end
+	PlaceEntityOnGroundProperly(entity, false)
 
 	local r2 = GetEntityRotation(entity, 2)
 	SetEntityRotation(entity, r2.x, r2.y, r1.z, 2)
@@ -1640,17 +1674,7 @@ end
 RegisterNUICallback('init', function(data, cb)
 	local bones
 
-	if Config.isRDR then
-		bones = Bones
-	else
-		bones = {}
-
-		for boneName, _ in pairs(Bones) do
-			table.insert(bones, boneName)
-		end
-
-		table.sort(bones)
-	end
+	bones = Bones
 
 	cb({
 		peds = json.encode(Peds),
@@ -2261,11 +2285,7 @@ RegisterNUICallback('giveWeapon', function(data, cb)
 	if Permissions.properties.ped.weapon and CanModifyEntity(data.handle) then
 		RequestControl(data.handle)
 
-		if Config.isRDR then
-			GiveWeaponToPed_2(data.handle, GetHashKey(data.weapon), 500, true, false, 0, false, 0.5, 1.0, 0, false, 0.0, false)
-		else
-			GiveWeaponToPed(data.handle, GetHashKey(data.weapon), 500, false, true)
-		end
+		GiveWeaponToPed_2(data.handle, GetHashKey(data.weapon), 500, true, false, 0, false, 0.5, 1.0, 0, false, 0.0, false)
 
 		if Database[data.handle] then
 			table.insert(Database[data.handle].weapons, data.weapon)
@@ -3011,6 +3031,22 @@ function MainSpoonerUpdates()
 			end
 		end
 
+		if CheckControls(IsDisabledControlJustReleased, 0, Config.ToggleHudControl) then
+			hud = not hud
+
+			if hud then
+				print(1)
+				SendNUIMessage({
+					type = 'HideHud'
+				})
+			else
+				print(2)
+				SendNUIMessage({
+					type = 'ShowHud'
+				})
+			end
+		end
+
 		if FocusTarget and CheckControls(IsDisabledControlJustPressed, 0, Config.ToggleFocusModeControl) then
 			if FreeFocus then
 				PointCamAtEntity(Cam, FocusTarget)
@@ -3252,23 +3288,12 @@ local function drawText3d(x, y, z, text)
 	if onScreen then
 		SetTextScale(0.35, 0.35)
 
-		if Config.isRDR then
-			SetTextFontForCurrentCommand(1)
-			SetTextColor(255, 255, 255, 255)
-		else
-			SetTextFont(0)
-			SetTextColour(255, 255, 255, 255)
-		end
+		SetTextFontForCurrentCommand(1)
+		SetTextColor(255, 255, 255, 255)
 
 		SetTextCentre(1)
 
-		if Config.isRDR then
-			DisplayText(CreateVarString(10, "LITERAL_STRING", text), screenX, screenY)
-		else
-			SetTextEntry("STRING")
-			AddTextComponentString(text)
-			DrawText(screenX, screenY)
-		end
+		DisplayText(CreateVarString(10, "LITERAL_STRING", text), screenX, screenY)
 	end
 end
 
@@ -3312,9 +3337,7 @@ CreateThread(function()
 	while true do
 		MainSpoonerUpdates()
 
-		if Config.isRDR then
-			SpoonerPrompts:handleEvents()
-		end
+		SpoonerPrompts:handleEvents()
 
 		drawEntityHandles()
 
@@ -3349,47 +3372,43 @@ function UpdateDbEntities()
 		end
 
 		-- Show prompts for certain spooner shortcuts on your own ped
-		if Config.isRDR then
-			if entity == playerPed then
-				if properties.scenario or properties.animation then
-					if Permissions.properties.ped.clearTasks then
-						if not ClearTasksPrompt:isEnabled() then
-							ClearTasksPrompt:setEnabledAndVisible(true)
-						end
+		if entity == playerPed then
+			if properties.scenario or properties.animation then
+				if Permissions.properties.ped.clearTasks then
+					if not ClearTasksPrompt:isEnabled() then
+						ClearTasksPrompt:setEnabledAndVisible(true)
+					end
 
-						enableSpoonerPrompts = true
-					end
-				else
-					if ClearTasksPrompt:isEnabled() then
-						ClearTasksPrompt:setEnabledAndVisible(false)
-					end
+					enableSpoonerPrompts = true
 				end
+			else
+				if ClearTasksPrompt:isEnabled() then
+					ClearTasksPrompt:setEnabledAndVisible(false)
+				end
+			end
 
-				if properties.attachment.bone then
-					if Permissions.properties.attachments then
-						if not DetachPrompt:isEnabled() then
-							DetachPrompt:setEnabledAndVisible(true)
-						end
-						enableSpoonerPrompts = true
+			if properties.attachment.bone then
+				if Permissions.properties.attachments then
+					if not DetachPrompt:isEnabled() then
+						DetachPrompt:setEnabledAndVisible(true)
 					end
-				else
-					if DetachPrompt:isEnabled() then
-						DetachPrompt:setEnabledAndVisible(false)
-					end
+					enableSpoonerPrompts = true
+				end
+			else
+				if DetachPrompt:isEnabled() then
+					DetachPrompt:setEnabledAndVisible(false)
 				end
 			end
 		end
 	end
 
-	if Config.isRDR then
-		if enableSpoonerPrompts then
-			if not SpoonerPrompts:isActive() then
-				SpoonerPrompts:setActive(true)
-			end
-		else
-			if SpoonerPrompts:isActive() then
-				SpoonerPrompts:setActive(false)
-			end
+	if enableSpoonerPrompts then
+		if not SpoonerPrompts:isActive() then
+			SpoonerPrompts:setActive(true)
+		end
+	else
+		if SpoonerPrompts:isActive() then
+			SpoonerPrompts:setActive(false)
 		end
 	end
 end

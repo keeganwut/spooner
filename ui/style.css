@@ -414,8 +414,12 @@ textarea {
 	align-items: center;
 }
 
-.copy-button {
-	grid-column: 2;
+.position-buttons {
+	display: flex;
+}
+
+.rotation-buttons {
+	display: flex;
 }
 
 #object-database-stats {
