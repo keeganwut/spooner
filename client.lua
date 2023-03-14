@@ -1107,6 +1107,45 @@ RegisterNUICallback('clearTempobj', function(data, cb)
 	cb({})
 end)
 
+RegisterNUICallback('loadObject', function(data, cb)
+	local entity
+
+	local spawnPos, entity, distance = getCamCoords()
+
+	if CurrentSpawn.type == 1 then
+		entity = SpawnPed{
+		name = CurrentSpawn.modelName,
+		model = GetHashKey(CurrentSpawn.modelName),
+		x = spawnPos.x,
+		y = spawnPos.y,
+		z = spawnPos.z,
+		pitch = 0.0,
+		roll = 0.0,
+		yaw = yaw2 + 180.0,
+		collisionDisabled = false,
+		isVisible = true,
+		outfit = -1,
+		isInGroup = false,
+		blockNonTemporaryEvents = false
+	}
+
+	elseif CurrentSpawn.type == 2 then
+		entity = SpawnVehicle(CurrentSpawn.modelName, GetHashKey(CurrentSpawn.modelName), spawnPos.x, spawnPos.y, spawnPos.z, 0.0, 0.0, yaw2, false, true)
+	elseif CurrentSpawn.type == 3 then
+		entity = SpawnObject(CurrentSpawn.modelName, GetHashKey(CurrentSpawn.modelName), spawnPos.x, spawnPos.y, spawnPos.z, 0.0, 0.0, yaw2, false, true, nil, nil, nil)
+	elseif CurrentSpawn.type == 4 then
+		entity = SpawnPropset(CurrentSpawn.modelName, GetHashKey(CurrentSpawn.modelName), spawnPos.x, spawnPos.y, spawnPos.z, yaw2)
+	elseif CurrentSpawn.type == 5 then
+		entity = SpawnPickup(CurrentSpawn.modelName, GetHashKey(CurrentSpawn.modelName), spawnPos.x, spawnPos.y, spawnPos.z)
+	end
+
+	if entity then
+		PlaceOnGroundProperly(entity)
+	end
+
+	cb({})
+end)
+
 RegisterNUICallback('closeObjectMenu', function(data, cb)
 	if data.modelName and (Permissions.spawn.byName or Contains(Objects, data.modelName)) then
 		CurrentSpawn = {
@@ -2115,6 +2154,7 @@ end)
 
 RegisterNUICallback('closeMenu', function(data, cb)
 	SetNuiFocus(false, false)
+
 	cb({})
 end)
 
@@ -3035,12 +3075,10 @@ function MainSpoonerUpdates()
 			hud = not hud
 
 			if hud then
-				print(1)
 				SendNUIMessage({
 					type = 'HideHud'
 				})
 			else
-				print(2)
 				SendNUIMessage({
 					type = 'ShowHud'
 				})

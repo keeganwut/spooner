@@ -362,6 +362,10 @@ function closeObjectMenu(selected) {
 	}
 }
 
+function loadObject() {
+	sendMessage('loadObject')
+}
+
 function closePropsetMenu(selected) {
 	document.querySelector('#propset-menu').style.display = 'none';
 
@@ -1893,6 +1897,10 @@ window.addEventListener('load', function() {
 
 	document.querySelector('#object-menu-close-btn').addEventListener('click', function(event) {
 		closeObjectMenu();
+	});
+
+	document.querySelector('#object-menu-load-btn').addEventListener('click', function(event) {
+		loadObject();
 	});
 
 	document.querySelector('#propset-menu-close-btn').addEventListener('click', function(event) {
