@@ -11,6 +11,8 @@ Tool for spawning, placing, and removing entities, inspired by Menyoo's Object S
 - Saved databases are stored client-side, so you can load them on any server with this resource
 - Import and export sets of entities to share with others or to convert to a permanent map
 - Permissions system for controlling access to individual features
+- Filtering for spawned entities in database
+- Entity Previews before placing
 
 # Example
 
